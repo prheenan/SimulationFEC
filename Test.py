@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import sys
 
 from . import Simulation
-from UtilGeneral import CheckpointUtilities,GenUtilities
+from .UtilGeneral import CheckpointUtilities,GenUtilities
 
 class SimpleFEC(object):
     def __init__(self, Time, Extension, Force, SpringConstant=0.4e-3,
@@ -49,7 +49,7 @@ def get_simulated_ensemble(n,**kw):
         n: number of curves 
         **kw: for Util.Simulation.hummer_force_extension_curve
     Returns:
-        n IWT objects
+        n IWT objects, as a generator (to facilitate saving out one at a time)
     """
     to_ret = []
     for _ in range(n):
@@ -66,8 +66,7 @@ def get_simulated_ensemble(n,**kw):
                             SpringConstant=spring_constant,
                             Offset=z0)
         tmp = SimpleFEC(**initial_dict)
-        to_ret.append(tmp)
-    return to_ret
+        yield tmp
 
 def load_simulated_data(n,cache_dir="./cache"):
     """
