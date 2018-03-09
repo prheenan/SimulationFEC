@@ -68,7 +68,7 @@ def get_simulated_ensemble(n,**kw):
         tmp = SimpleFEC(**initial_dict)
         yield tmp
 
-def load_simulated_data(n,cache_dir="./cache"):
+def load_simulated_data(n,cache_dir="./cache",**kw):
     """
     returns: at most n forward and reverse (2*n total) from cache_dir, or
     re-creates using get_simulated_ensemble
@@ -76,8 +76,8 @@ def load_simulated_data(n,cache_dir="./cache"):
     cache_fwd,cache_rev = [cache_dir + s +"/" for s in ["_fwd","_rev"]]
     GenUtilities.ensureDirExists(cache_fwd)
     GenUtilities.ensureDirExists(cache_rev)
-    func_fwd = lambda : get_simulated_ensemble(n)
-    func_rev = lambda : get_simulated_ensemble(n,reverse=True)
+    func_fwd = lambda : get_simulated_ensemble(n,**kw)
+    func_rev = lambda : get_simulated_ensemble(n,reverse=True,**kw)
     fwd = CheckpointUtilities.multi_load(cache_fwd,func_fwd,limit=n)
     rev = CheckpointUtilities.multi_load(cache_rev,func_rev,limit=n)
     return fwd,rev

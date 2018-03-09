@@ -66,7 +66,7 @@ def _unit_test_p():
     _f_assert(1-np.exp(-6),p_jump_n,q_n=2,q_n_plus_one=1,**kw)
     _f_assert(1-np.exp(-8),p_jump_n,q_n=2,q_n_plus_one=2,**kw)
 
-def safe_exp(arg,tol=np.log(np.finfo('d').max-1)):
+def safe_exp(arg,tol=np.log(np.finfo('d').max-50)):
     """
     Args:
        arg: what we want to exponentiate
@@ -344,7 +344,7 @@ def simulate(n_steps_equil,n_steps_experiment,x1,x2,x_cap_minus_x1,
     states = np.array([s.state for s in all_data])
     return time,ext,z,force
 
-def hummer_force_extension_curve(delta_t=1e-5,reverse=False):
+def hummer_force_extension_curve(delta_t=1e-5,k=0.1e-3,reverse=False):
     """
        a single force-extension curve using the hummer 2010 formalism
     Args:
@@ -360,7 +360,6 @@ def hummer_force_extension_curve(delta_t=1e-5,reverse=False):
         z_0 = z_f
         z_f = tmp
     R = 25e-12
-    k = 0.1e-3
     k_L = 0.29e-3
     v = R * ((1/k)+(1/k_L))
     sign = np.sign(z_f-z_0)
