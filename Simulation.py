@@ -9,13 +9,30 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 class SimpleFEC(object):
-    def __init__(self,t,x,z,f,p):
+    def __init__(self,t,x,z,f,p,states):
         self.Time = t
         self.Extension = x
         self.ZSnsr = z
         self.Force = f
-        self.State = p
+        self.States = states
+        self.p = p
 
+class simulation_state:
+    def __init__(self,state,q_n,F_n,k_n,dV_n,z=None,i=None):
+        self.q_n = q_n
+        self.F_n = F_n
+        self.state = state
+        self.k_n = k_n
+        self.dV_n = dV_n
+        self.i = i
+        self.z = z
+        self.t = None
+    @property
+    def force(self):
+        return self.F_n
+    @property
+    def extension(self):
+        return self.q_n
 
 def _f_assert(exp,f,atol=1e-6,rtol=1e-9,**d):
     value = f(**d)
@@ -223,24 +240,6 @@ def F_q_i(k_L,x_i,q_n):
     # see: near equation 16
     return -k_L * (x_i - q_n)
 
-class simulation_state:
-    def __init__(self,state,q_n,F_n,k_n,dV_n,z=None,i=None):
-        self.q_n = q_n
-        self.F_n = F_n
-        self.state = state
-        self.k_n = k_n
-        self.dV_n = dV_n
-        self.i = i
-        self.z = z
-        self.t = None
-    @property
-    def force(self):
-        return self.F_n
-    @property
-    def extension(self):
-        return self.q_n
-
-
 def single_attempt(states,state,k,z,**kw):
     """
     makes a single step/attempt at barrrier switching
@@ -351,13 +350,16 @@ def simulate(n_steps_equil,n_steps_experiment,x1,x2,x_cap_minus_x1,
     ext = np.array([s.extension for s in all_data])
     z = np.array([s.z for s in all_data])
     states = np.array([s.state for s in all_data])
-    return time,ext,z,force
+    return time,ext,z,force,states
 
 def _hummer_ramp_functor(time_total,n,v,z_0):
-    to_ret = lambda i: (time_total * i / n) * v + z_0
-    return to_ret
+    return lambda i : (time_total * i / n) * v + z_0
 
-def hummer_force_extension_curve(delta_t=1e-5,k=0.1e-3,reverse=False):
+def hummer_force_extension_curve(delta_t=1e-5,k=0.1e-3,k_L=0.29e-3,
+                                 z_0 = 270e-9, z_f=470e-9,x1=170e-9,
+                                 x2=192e-9,x_cap_minus_x1=11.9e-9,
+                                 R=25e-12,
+                                 D_q=(250 * 1e-18)/1e-3,reverse=False):
     """
        a single force-extension curve using the hummer 2010 formalism
     Args:
@@ -365,23 +367,19 @@ def hummer_force_extension_curve(delta_t=1e-5,k=0.1e-3,reverse=False):
     Returns: 
        tuple of <time,q,z,force,params>
     """
-    z_0 = 270e-9
-    z_f = 470e-9
     # swap the forward and reverse if we are reversing
     if (reverse):
         tmp = z_0
         z_0 = z_f
         z_f = tmp
-    R = 25e-12
-    k_L = 0.29e-3
     v = R * ((1/k)+(1/k_L))
     sign = np.sign(z_f-z_0)
     v *= sign
     time_total = (z_f-z_0)/v
     n = int(np.ceil(time_total/delta_t))
-    params = dict(x1=170e-9,
-                  x2=192e-9,
-                  x_cap_minus_x1=11.9e-9,
+    params = dict(x1=x1,
+                  x2=x2,
+                  x_cap_minus_x1=x_cap_minus_x1,
                   k_L=k_L,
                   k=k,
                   k_0_1=np.exp(-39),
@@ -391,15 +389,16 @@ def hummer_force_extension_curve(delta_t=1e-5,k=0.1e-3,reverse=False):
                   z_f=_hummer_ramp_functor(time_total,n,v,z_0),
                   s_0=0,
                   delta_t=delta_t,
-                  D_q=(250 * 1e-18)/1e-3)
-    time,ext,z,force = \
+                  D_q=D_q)
+    time,ext,z,force, states = \
         simulate(n_steps_equil=2000,n_steps_experiment=n,**params)
+    params['z_f'] = z[-1]
     full_params = dict(velocity=v,**params)
-    return time,ext,z,force*-1,full_params
+    return time,ext,z,force*-1,full_params, states
 
 def HummerSimpleFEC(**kwargs):
-    t, x, z, f, p = hummer_force_extension_curve(**kwargs)
-    return SimpleFEC(t=t,x=x,z=z,f=f,p=p)
+    t, x, z, f, p,states = hummer_force_extension_curve(**kwargs)
+    return SimpleFEC(t=t,x=x,z=z,f=f,p=p,states=states)
 
 def run():
     """
@@ -421,7 +420,7 @@ def run():
     np.random.seed(42)
     unit_test()
     for reverse in [False,True]:
-        t,x,z,f,p = hummer_force_extension_curve(reverse=reverse)
+        t,x,z,f,p,_ = hummer_force_extension_curve(reverse=reverse)
         plt.subplot(2,1,1)
         plt.plot(t,z)
         plt.plot(t,x)
