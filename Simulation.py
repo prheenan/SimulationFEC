@@ -8,6 +8,15 @@ from __future__ import unicode_literals
 import numpy as np
 import matplotlib.pyplot as plt
 
+class SimpleFEC(object):
+    def __init__(self,t,x,z,f,p):
+        self.Time = t
+        self.Extension = x
+        self.ZSnsr = z
+        self.Force = f
+        self.State = p
+
+
 def _f_assert(exp,f,atol=1e-6,rtol=1e-9,**d):
     value = f(**d)
     np.testing.assert_allclose(value,exp,atol=atol,rtol=rtol)
@@ -66,7 +75,7 @@ def _unit_test_p():
     _f_assert(1-np.exp(-6),p_jump_n,q_n=2,q_n_plus_one=1,**kw)
     _f_assert(1-np.exp(-8),p_jump_n,q_n=2,q_n_plus_one=2,**kw)
 
-def safe_exp(arg,tol=np.log(np.finfo('d').max-50)):
+def safe_exp(arg,tol=np.log(np.finfo('d').max-100)):
     """
     Args:
        arg: what we want to exponentiate
@@ -344,6 +353,10 @@ def simulate(n_steps_equil,n_steps_experiment,x1,x2,x_cap_minus_x1,
     states = np.array([s.state for s in all_data])
     return time,ext,z,force
 
+def _hummer_ramp_functor(time_total,n,v,z_0):
+    to_ret = lambda i: (time_total * i / n) * v + z_0
+    return to_ret
+
 def hummer_force_extension_curve(delta_t=1e-5,k=0.1e-3,reverse=False):
     """
        a single force-extension curve using the hummer 2010 formalism
@@ -375,7 +388,7 @@ def hummer_force_extension_curve(delta_t=1e-5,k=0.1e-3,reverse=False):
                   k_0_2=np.exp(39.2),
                   beta=1/(4.1e-21),
                   z_0=z_0,
-                  z_f=lambda i: (time_total * i/n) * v + z_0,
+                  z_f=_hummer_ramp_functor(time_total,n,v,z_0),
                   s_0=0,
                   delta_t=delta_t,
                   D_q=(250 * 1e-18)/1e-3)
@@ -383,6 +396,10 @@ def hummer_force_extension_curve(delta_t=1e-5,k=0.1e-3,reverse=False):
         simulate(n_steps_equil=2000,n_steps_experiment=n,**params)
     full_params = dict(velocity=v,**params)
     return time,ext,z,force*-1,full_params
+
+def HummerSimpleFEC(**kwargs):
+    t, x, z, f, p = hummer_force_extension_curve(**kwargs)
+    return SimpleFEC(t=t,x=x,z=z,f=f,p=p)
 
 def run():
     """
