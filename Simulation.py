@@ -315,7 +315,8 @@ def _simulate(state_current,n_steps_experiment,z_f,states,delta_t,**kw):
     return time,ext,z,force,states
 
 def simulate(n_steps_equil,n_steps_experiment,x1,x2,x_cap_minus_x1,
-             k_L,k,k_0_1,k_0_2,beta,z_0,z_f,s_0,delta_t,D_q,f_dV=None):
+             k_L,k,k_0_1,k_0_2,beta,z_0,z_f,s_0,delta_t,D_q,f_dV=None,
+             f_dV_equil=None):
     """
     simulates a two-state system
 
@@ -346,20 +347,26 @@ def simulate(n_steps_equil,n_steps_experiment,x1,x2,x_cap_minus_x1,
     # get the potential gradient (dV/dQ) as a function of q and z
     if f_dV is None:
         f_dV = get_dV_dq
+    if f_dV_equil is None:
+        f_dV_equil = f_dV
     dV1,dV2 =  f_dV(barrier_x,k_L=k_L,k=k)
+    dV1_equil,dV2_equil =  f_dV_equil(barrier_x,k_L=k_L,k=k)
+
     k1,k2 = get_ks(barrier_x,k_arr,beta=beta,k_L=k_L,x_cap=x_cap)
     states = [ [k1,dV1],
                [k2,dV2]]
-    k_n,dV_n = states[s_0]
+    states_equil = [ [k1,dV1_equil],
+                     [k2,dV2_equil]]
+    k_n,dV_n = states_equil[s_0]
     q_n = z_0
-    q_equil = [q_n]
-    F_equil = [0]
     kw = dict(k=k, D_q=D_q, beta=beta, delta_t=delta_t)
     state_current = simulation_state(state=s_0,q_n=z_0,k_n=k_n,dV_n=dV_n,F_n=0,
                                      z=z_0)
-    state_equil = _equilibrate(state_current,states,n_steps_equil,z_0,**kw)
+    state_current = _equilibrate(state_current,states_equil,n_steps_equil,z_0,
+                                 **kw)
     # POST: everything is equilibrated; go ahead and run the actual test
-    state_current = state_equil[-1]
+    state_current = state_current[-1]
+    state_current.dV_n = states[state_current.state][1]
     time,ext,z,force,states = _simulate(state_current,n_steps_experiment,z_f,
                                         states,**kw)
     return time,ext,z,force,states
@@ -371,7 +378,7 @@ def hummer_force_extension_curve(delta_t=1e-5,k=0.1e-3,k_L=0.29e-3,
                                  z_0 = 270e-9, z_f=470e-9,x1=170e-9,
                                  x2=192e-9,x_cap_minus_x1=11.9e-9,
                                  R=25e-12,
-                                 D_q=(250 * 1e-18)/1e-3,reverse=False):
+                                 D_q=(250 * 1e-18)/1e-3,reverse=False,**kw):
     """
        a single force-extension curve using the hummer 2010 formalism
     Args:
@@ -401,7 +408,7 @@ def hummer_force_extension_curve(delta_t=1e-5,k=0.1e-3,k_L=0.29e-3,
                   z_f=_hummer_ramp_functor(time_total,n,v,z_0),
                   s_0=0,
                   delta_t=delta_t,
-                  D_q=D_q)
+                  D_q=D_q,**kw)
     time,ext,z,force, states = \
         simulate(n_steps_equil=2000,n_steps_experiment=n,**params)
     params['z_f'] = z[-1]
