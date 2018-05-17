@@ -441,12 +441,6 @@ def run():
     unit_test()
     for reverse in [False,True]:
         t,x,z,f,p,_ = hummer_force_extension_curve(reverse=reverse)
-        plt.subplot(2,1,1)
-        plt.plot(t,z)
-        plt.plot(t,x)
-        plt.subplot(2,1,2)
-        plt.plot(t,f)
-        plt.show()
     # do the reverse a bunch of times
     for _ in range(5):
         hummer_force_extension_curve(reverse=True)
