@@ -286,8 +286,36 @@ def get_dV_dq(barrier_x,**kw):
            for i in range(n)]
     return arr
 
+def _equilibrate(state_current,states,n_steps_equil,z_0,**kw):
+    state_equil = [state_current]
+    for i in range(n_steps_equil):
+        state_current = single_attempt(states,state_current,z=z_0,**kw)
+        state_equil.append(state_current)
+    return state_equil
+
+def _simulate(state_current,n_steps_experiment,z_f,states,delta_t,**kw):
+    state_current.i = 0
+    state_current.t = 0
+    state_current.z = state_current.z
+    state_exp = []
+    for i in range(n_steps_experiment):
+        z_tmp = z_f(i)
+        # save the iteration information
+        state_current = single_attempt(states,state_current,z=z_tmp,
+                                       delta_t=delta_t,**kw)
+        state_current.i = i
+        state_current.t = i * delta_t
+        state_exp.append(state_current)
+    all_data = state_exp
+    force = np.array([s.force for s in all_data])
+    time = np.array([s.t for s in all_data])
+    ext = np.array([s.extension for s in all_data])
+    z = np.array([s.z for s in all_data])
+    states = np.array([s.state for s in all_data])
+    return time,ext,z,force,states
+
 def simulate(n_steps_equil,n_steps_experiment,x1,x2,x_cap_minus_x1,
-             k_L,k,k_0_1,k_0_2,beta,z_0,z_f,s_0,delta_t,D_q):
+             k_L,k,k_0_1,k_0_2,beta,z_0,z_f,s_0,delta_t,D_q,f_dV=None):
     """
     simulates a two-state system
 
@@ -316,7 +344,9 @@ def simulate(n_steps_equil,n_steps_experiment,x1,x2,x_cap_minus_x1,
     k_arr = [k_0_1,k_0_2]
     x_cap = x_cap_minus_x1 + x1
     # get the potential gradient (dV/dQ) as a function of q and z
-    dV1,dV2 =  get_dV_dq(barrier_x,k_L=k_L,k=k)
+    if f_dV is None:
+        f_dV = get_dV_dq
+    dV1,dV2 =  f_dV(barrier_x,k_L=k_L,k=k)
     k1,k2 = get_ks(barrier_x,k_arr,beta=beta,k_L=k_L,x_cap=x_cap)
     states = [ [k1,dV1],
                [k2,dV2]]
@@ -324,32 +354,14 @@ def simulate(n_steps_equil,n_steps_experiment,x1,x2,x_cap_minus_x1,
     q_n = z_0
     q_equil = [q_n]
     F_equil = [0]
+    kw = dict(k=k, D_q=D_q, beta=beta, delta_t=delta_t)
     state_current = simulation_state(state=s_0,q_n=z_0,k_n=k_n,dV_n=dV_n,F_n=0,
                                      z=z_0)
-    state_equil = [state_current]
-    kw = dict(k=k,D_q=D_q,beta=beta,delta_t=delta_t)
-    for i in range(n_steps_equil):
-        state_current = single_attempt(states,state_current,z=z_0,**kw)
-        state_equil.append(state_current)
+    state_equil = _equilibrate(state_current,states,n_steps_equil,z_0,**kw)
     # POST: everything is equilibrated; go ahead and run the actual test
     state_current = state_equil[-1]
-    state_current.i = 0
-    state_current.t = 0
-    state_current.z = z_0
-    state_exp = [state_current] 
-    for i in range(n_steps_experiment):
-        z_tmp = z_f(i)
-        # save the iteration information
-        state_current = single_attempt(states,state_current,z=z_tmp,**kw)
-        state_current.i = i
-        state_current.t = i * delta_t
-        state_exp.append(state_current)
-    all_data = state_exp
-    force = np.array([s.force for s in all_data])
-    time = np.array([s.t for s in all_data])
-    ext = np.array([s.extension for s in all_data])
-    z = np.array([s.z for s in all_data])
-    states = np.array([s.state for s in all_data])
+    time,ext,z,force,states = _simulate(state_current,n_steps_experiment,z_f,
+                                        states,**kw)
     return time,ext,z,force,states
 
 def _hummer_ramp_functor(time_total,n,v,z_0):
