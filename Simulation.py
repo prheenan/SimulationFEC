@@ -18,7 +18,7 @@ class SimpleFEC(object):
         self.p = p
 
 class simulation_state:
-    def __init__(self,state,q_n,F_n,k_n,dV_n,z=None,i=None):
+    def __init__(self,state,q_n,F_n,k_n,dV_n,z=None,i=0,t=0):
         self.q_n = q_n
         self.F_n = F_n
         self.state = state
@@ -26,7 +26,7 @@ class simulation_state:
         self.dV_n = dV_n
         self.i = i
         self.z = z
-        self.t = None
+        self.t = t
     @property
     def force(self):
         return self.F_n
@@ -240,7 +240,7 @@ def F_q_i(k_L,x_i,q_n):
     # see: near equation 16
     return -k_L * (x_i - q_n)
 
-def single_attempt(states,state,k,z,**kw):
+def single_attempt(states,state,k,z,delta_t,**kw):
     """
     makes a single step/attempt at barrrier switching
 
@@ -254,12 +254,13 @@ def single_attempt(states,state,k,z,**kw):
         next simulation state
     """
     dV_tmp = lambda q: state.dV_n(q,z)
-    q_next,swap = single_step(q_n=state.q_n,dV_dq=dV_tmp,k_i=state.k_n,**kw)
+    q_next,swap = single_step(q_n=state.q_n,dV_dq=dV_tmp,k_i=state.k_n,
+                              delta_t=delta_t,**kw)
     state_n = 1-state.state if swap else state.state
     k_n,dV_n = states[state_n]
     force = k * (q_next-z)
     return simulation_state(state=state_n,q_n=q_next,F_n=force,k_n=k_n,
-                            dV_n=dV_n,z=z)
+                            dV_n=dV_n,z=z,i=state.i+1,t=state.t+delta_t)
 
 def _build_lambda(function,**kw):
     """
@@ -294,17 +295,12 @@ def _equilibrate(state_current,states,n_steps_equil,z_0,**kw):
     return state_equil
 
 def _simulate(state_current,n_steps_experiment,z_f,states,delta_t,**kw):
-    state_current.i = 0
-    state_current.t = 0
-    state_current.z = state_current.z
     state_exp = []
     for i in range(n_steps_experiment):
         z_tmp = z_f(i)
         # save the iteration information
         state_current = single_attempt(states,state_current,z=z_tmp,
                                        delta_t=delta_t,**kw)
-        state_current.i = i
-        state_current.t = i * delta_t
         state_exp.append(state_current)
     all_data = state_exp
     force = np.array([s.force for s in all_data])
@@ -316,7 +312,7 @@ def _simulate(state_current,n_steps_experiment,z_f,states,delta_t,**kw):
 
 def simulate(n_steps_equil,n_steps_experiment,x1,x2,x_cap_minus_x1,
              k_L,k,k_0_1,k_0_2,beta,z_0,z_f,s_0,delta_t,D_q,f_dV=None,
-             f_dV_equil=None,skip_equil=False,state_current=None):
+             skip_equil=False,state_current=None):
     """
     simulates a two-state system
 
@@ -347,21 +343,16 @@ def simulate(n_steps_equil,n_steps_experiment,x1,x2,x_cap_minus_x1,
     # get the potential gradient (dV/dQ) as a function of q and z
     if f_dV is None:
         f_dV = get_dV_dq
-    if f_dV_equil is None:
-        f_dV_equil = f_dV
     dV1,dV2 =  f_dV(barrier_x,k_L=k_L,k=k)
-    dV1_equil,dV2_equil =  f_dV_equil(barrier_x,k_L=k_L,k=k)
     k1,k2 = get_ks(barrier_x,k_arr,beta=beta,k_L=k_L,x_cap=x_cap)
     states = [ [k1,dV1],
                [k2,dV2]]
-    states_equil = [ [k1,dV1_equil],
-                     [k2,dV2_equil]]
-    k_n,dV_n = states_equil[s_0]
+    k_n,dV_n = states[s_0]
     kw = dict(k=k, D_q=D_q, beta=beta, delta_t=delta_t)
     if (not skip_equil) or (state_current is None):
         state_current = simulation_state(state=s_0, q_n=z_0, k_n=k_n, dV_n=dV_n,
                                          F_n=0,z=z_0)
-        state_current = _equilibrate(state_current,states_equil,n_steps_equil,
+        state_current = _equilibrate(state_current,states,n_steps_equil,
                                      z_0,**kw)
         state_current = state_current[-1]
     # POST: everything is equilibrated; go ahead and run the actual test
@@ -378,7 +369,7 @@ def _hummer_ramp_functor(time_total,n,v,z_0):
 def hummer_force_extension_curve(delta_t=1e-5,k=0.1e-3,k_L=0.29e-3,
                                  z_0 = 270e-9, z_f=470e-9,x1=170e-9,
                                  x2=192e-9,x_cap_minus_x1=11.9e-9,
-                                 R=25e-12,
+                                 R=25e-12,k_0_1=np.exp(-39),k_0_2=np.exp(39.2),
                                  D_q=(250 * 1e-18)/1e-3,reverse=False,**kw):
     """
        a single force-extension curve using the hummer 2010 formalism
@@ -402,8 +393,8 @@ def hummer_force_extension_curve(delta_t=1e-5,k=0.1e-3,k_L=0.29e-3,
                   x_cap_minus_x1=x_cap_minus_x1,
                   k_L=k_L,
                   k=k,
-                  k_0_1=np.exp(-39),
-                  k_0_2=np.exp(39.2),
+                  k_0_1=k_0_1,
+                  k_0_2=k_0_2,
                   beta=1/(4.1e-21),
                   z_0=z_0,
                   z_f=_hummer_ramp_functor(time_total,n,v,z_0),
