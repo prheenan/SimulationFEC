@@ -370,7 +370,9 @@ def hummer_force_extension_curve(delta_t=1e-5,k=0.1e-3,k_L=0.29e-3,
                                  z_0 = 270e-9, z_f=470e-9,x1=170e-9,
                                  x2=192e-9,x_cap_minus_x1=11.9e-9,
                                  R=25e-12,k_0_1=np.exp(-39),k_0_2=np.exp(39.2),
-                                 D_q=(250 * 1e-18)/1e-3,reverse=False,**kw):
+                                 D_q=(250 * 1e-18)/1e-3,reverse=False,
+                                 n_steps=None,
+                                 **kw):
     """
        a single force-extension curve using the hummer 2010 formalism
     Args:
@@ -386,8 +388,11 @@ def hummer_force_extension_curve(delta_t=1e-5,k=0.1e-3,k_L=0.29e-3,
     v = R * ((1/k)+(1/k_L))
     sign = np.sign(z_f-z_0)
     v *= sign
-    time_total = (z_f-z_0)/v
-    n = int(np.ceil(time_total/delta_t))
+    if n_steps is None:
+        time_total = (z_f - z_0) / v
+        n_steps = int(np.ceil(time_total/delta_t))
+    else:
+        time_total = delta_t * n_steps
     params = dict(x1=x1,
                   x2=x2,
                   x_cap_minus_x1=x_cap_minus_x1,
@@ -397,12 +402,12 @@ def hummer_force_extension_curve(delta_t=1e-5,k=0.1e-3,k_L=0.29e-3,
                   k_0_2=k_0_2,
                   beta=1/(4.1e-21),
                   z_0=z_0,
-                  z_f=_hummer_ramp_functor(time_total,n,v,z_0),
+                  z_f=_hummer_ramp_functor(time_total,n_steps,v,z_0),
                   s_0=0,
                   delta_t=delta_t,
                   D_q=D_q,**kw)
     time,ext,z,force, states = \
-        simulate(n_steps_equil=2000,n_steps_experiment=n,**params)
+        simulate(n_steps_equil=2000,n_steps_experiment=n_steps,**params)
     params['z_f'] = z[-1]
     full_params = dict(velocity=v,**params)
     return time,ext,z,force*-1,full_params, states
