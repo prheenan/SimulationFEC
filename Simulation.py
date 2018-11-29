@@ -7,6 +7,7 @@ from __future__ import unicode_literals
 # This file is used for importing the common utilities classes.
 import numpy as np
 import matplotlib.pyplot as plt
+import copy
 
 class SimpleFEC(object):
     def __init__(self,t,x,z,f,p,states):
@@ -16,6 +17,18 @@ class SimpleFEC(object):
         self.Force = f
         self.States = states
         self.p = p
+    def _slice(self,i):
+        to_ret = copy.deepcopy(self)
+        sanit_slice = lambda x: np.array(x).copy()[i]
+        to_ret.Time = sanit_slice(to_ret.Time)
+        to_ret.Extension = sanit_slice(to_ret.Extension)
+        to_ret.ZSnsr = sanit_slice(to_ret.ZSnsr)
+        to_ret.Force = sanit_slice(to_ret.Force)
+        to_ret.States = sanit_slice(to_ret.States)
+        return to_ret
+    @property
+    def Separation(self):
+        return self.Extension
 
 class simulation_state:
     def __init__(self,state,q_n,F_n,k_n,dV_n,z=None,i=0,t=0):
