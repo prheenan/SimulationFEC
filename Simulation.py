@@ -291,12 +291,16 @@ def get_ks(barrier_x,k_arr,**kw):
            for i in range(n)]
     return arr
 
-def get_dV_dq(barrier_x,**kw):
+
+
+def get_dV_dq(barrier_x,f_to_use=None,**kw):
     """
     see get_ks, except returns dV_dq(q,z)
     """
     n = len(barrier_x)
-    arr = [_build_lambda(dV_dq_i,x_i=barrier_x[i],**kw)
+    if f_to_use is None:
+        f_to_use = [dV_dq_i for _ in range(n)]
+    arr = [_build_lambda(f_to_use[i],x_i=barrier_x[i],**kw)
            for i in range(n)]
     return arr
 
