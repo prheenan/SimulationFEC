@@ -13,15 +13,15 @@ from . import Simulation
 from .AppWLC.Code import WLC
 from scipy.interpolate import interp1d
 
-class SimulationConstructor(object):
-    def __init__(self,kw_1_sim=dict(),kw_1_stretch=dict(),kw_2_stretch=None,
+class SimulateObject(object):
+    def __init__(self,kw_simulate=dict(),kw_1_stretch=dict(),kw_2_stretch=None,
                  ignore_stretching=False):
         """
-        :param kw_1_sim: passed to  Simulation.HummerSimpleFEC
+        :param kw_simulate: passed to  Simulation.HummerSimpleFEC
         :param kw_1_stretch: keywords to wlc_interpolator
         :param kw_2_stretch: keywords to wlc_interpolator
         """
-        self.kw_sim = kw_1_sim
+        self.kw_sim = kw_simulate
         self.kw_1_stretch = kw_1_stretch
         if kw_2_stretch is None:
             kw_2_stretch = kw_1_stretch
