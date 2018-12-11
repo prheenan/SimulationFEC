@@ -225,7 +225,14 @@ def k_i_f(q_n,k_0_i,beta,k_L,x_i,x_cap):
         transition rate, 1/s
     """
     # see: near equation 16
-    return k_0_i * safe_exp(-beta/2 * k_L * ((x_cap-q_n)**2 - (x_i-q_n)**2))
+    d1 = x_cap-q_n
+    d2 = x_i-q_n
+    if (abs(d1 - d2) < 1e-15):
+        squared = 0
+    else:
+        squared = (d1 ** 2 - d2 ** 2)
+    exp_arg = safe_exp(-beta/2 * k_L * squared)
+    return k_0_i * exp_arg
 
 def dV_dq_i(q_n,z_n,k_L,x_i,k):
     """
