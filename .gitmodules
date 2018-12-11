@@ -1,3 +1,6 @@
 [submodule "UtilGeneral"]
 	path = UtilGeneral
 	url = https://github.com/prheenan/UtilGeneral.git
+[submodule "AppWLC"]
+	path = AppWLC
+	url = https://github.com/prheenan/AppWLC.git
