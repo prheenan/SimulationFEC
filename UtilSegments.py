@@ -20,13 +20,17 @@ class SegmentInfo(object):
         self.dZ_final = dZ_final
 
 class SimulatedSegmentFEC(object):
-    def __init__(self,kw_simulation,force_function,kw_force):
+    def __init__(self,kw_simulation,force_function,kw_force_1,kw_force_2):
         self.kw_simulation = kw_simulation
         self.force_function = force_function
-        self.kw_force = kw_force
+        self.kw_force_1 = kw_force_1
+        self.kw_force_2 = kw_force_2
     @property
     def _interp_F(self):
-        _interp_F = self.force_function(**self.kw_force)
+        _interp_F = dict([[self.kw_simulation['x1'],
+                          self.force_function(**self.kw_force_1)],
+                         [self.kw_simulation['x2'],
+                          self.force_function(**self.kw_force_2)]])
         return _interp_F
     def _eq_potential(self,*args,**kwargs):
         return get_dV_dq(*args, f=equilibration_potential,**kwargs)
@@ -46,7 +50,7 @@ def wlc_interpolator(Lp=0.3e-9,L0=200e-9,K0=100e-12,F_max=200e-12):
 def fec_potential(q_n,z_n,k_L,x_i,k,interp_F):
     landscape = Simulation.dV_dq_i(q_n, z_n, 0, x_i, k)
     # also add in the WLC element
-    force_WLC = interp_F(q_n)
+    force_WLC = interp_F[x_i](q_n)
     return landscape + force_WLC
 
 def equilibration_potential(q_n,z_n,k_L,x_i,k):
