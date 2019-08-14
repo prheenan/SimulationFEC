@@ -31,6 +31,8 @@ class SimpleFEC(object):
         return self.Extension
 
 class simulation_state:
+    # use slots to avoid ridiculous dictionary overhead.
+    __slots__ = ['state','q_n', 'F_n','k_n','dV_n','z','i','t']
     def __init__(self,state,q_n,F_n,k_n,dV_n,z=None,i=0,t=0):
         self.q_n = q_n
         self.F_n = F_n
@@ -56,15 +58,15 @@ def _unit_test_q():
     assuming that dV_dq is OK, tests that q_(n+1) (ie q_next) works
     """
     # test with no diffusion (no randomness) -- we stay at the same place
-    kw = dict(beta=1/(4.1e-21),delta_t=1e-7,D_q=0,q_0=0)
-    _f_assert(0,next_q,dV_dq=lambda q: 0,**kw)
-    _f_assert(0,next_q,dV_dq=lambda q: 1,**kw)
-    _f_assert(0,next_q,dV_dq=lambda q: 100,**kw)
+    kw = dict(beta=1/(4.1e-21),delta_t=1e-7,D_q=0,q_0=0,z=0)
+    _f_assert(0,next_q,dV_dq=lambda q,z: 0,**kw)
+    _f_assert(0,next_q,dV_dq=lambda q,z: 1,**kw)
+    _f_assert(0,next_q,dV_dq=lambda q,z: 100,**kw)
     # test with diffusion...
     kw_diffusion = dict(beta=1/(4.1e-21),delta_t=1e-7,D_q=10e-9,
-                        dV_dq=lambda q: 100)
+                        dV_dq=lambda q,z: 100,z=0)
     factor = kw_diffusion['D_q'] * kw_diffusion['delta_t'] * \
-             kw_diffusion['beta'] * kw_diffusion['dV_dq'](1) 
+             kw_diffusion['beta'] * kw_diffusion['dV_dq'](1,0)
     _f_assert(1-factor,next_q,q_0=1,**kw_diffusion)
 
 def _unit_test_dV_dq():
@@ -104,22 +106,6 @@ def _unit_test_p():
     _f_assert(1-np.exp(-4),p_jump_n,q_n=1,q_n_plus_one=1,**kw)
     _f_assert(1-np.exp(-6),p_jump_n,q_n=2,q_n_plus_one=1,**kw)
     _f_assert(1-np.exp(-8),p_jump_n,q_n=2,q_n_plus_one=2,**kw)
-
-def safe_exp(arg,tol=np.log(np.finfo('d').max-100)):
-    """
-    Args:
-       arg: what we want to exponentiate
-       tol: the maximum argument, defaults to max thing that exp can apply to
-    returns: 
-       exp(arg), unless arg>tol (then np.inf) or arg<-|tol| (then 0)
-    """
-    tol = abs(tol)
-    if (arg > tol):
-        return np.inf
-    elif (arg < -tol):
-        return 0
-    else:
-        return np.exp(arg)
 
 def _unit_test_utilities():
     """
@@ -161,7 +147,7 @@ def unit_test():
     _unit_test_utilities()
 
 
-def next_q(q_0,D_q,beta,delta_t,dV_dq):
+def next_q(q_0,D_q,beta,delta_t,dV_dq,z):
     """
     Returns the next molecular extension, as in appendix of Hummer, 2010
 
@@ -176,7 +162,7 @@ def next_q(q_0,D_q,beta,delta_t,dV_dq):
         the next q
     """
     g_n = np.random.normal(loc=0,scale=1)
-    dV_dq_i = dV_dq(q_0)
+    dV_dq_i = dV_dq(q_0,z)
     return q_0 - D_q * delta_t * beta * dV_dq_i + (2*D_q*delta_t)**(1/2) * g_n
 
 def p_jump_n(k_i,q_n,q_n_plus_one,delta_t):
@@ -191,10 +177,10 @@ def p_jump_n(k_i,q_n,q_n_plus_one,delta_t):
         probability between 0 and 1
     """
     exp_arg = -(k_i(q_n) + k_i(q_n_plus_one)) * delta_t/2
-    to_ret = 1-safe_exp(exp_arg)
+    to_ret = 1-np.exp(exp_arg)
     return to_ret
 
-def single_step(q_n,D_q,beta,delta_t,dV_dq,k_i):
+def single_step(q_n,D_q,beta,delta_t,dV_dq,k_i,z):
     """
     Runs a single step; gets q_n and if the molecule transitions
 
@@ -203,7 +189,8 @@ def single_step(q_n,D_q,beta,delta_t,dV_dq,k_i):
     Returns:
         tuple of <q_(n+1), did jump happen>
     """
-    q_n_plus_one = next_q(q_0=q_n,D_q=D_q,beta=beta,delta_t=delta_t,dV_dq=dV_dq)
+    q_n_plus_one = next_q(q_0=q_n,D_q=D_q,beta=beta,delta_t=delta_t,
+                          dV_dq=dV_dq,z=z)
     p_jump_tmp = p_jump_n(k_i=k_i,q_n=q_n,q_n_plus_one=q_n_plus_one,
                           delta_t=delta_t)
     random_uniform = np.random.rand()
@@ -231,7 +218,7 @@ def k_i_f(q_n,k_0_i,beta,k_L,x_i,x_cap):
         squared = 0
     else:
         squared = (d1 ** 2 - d2 ** 2)
-    exp_arg = safe_exp(-beta/2 * k_L * squared)
+    exp_arg = np.exp(-beta/2 * k_L * squared)
     return k_0_i * exp_arg
 
 def dV_dq_i(q_n,z_n,k_L,x_i,k):
@@ -260,6 +247,7 @@ def F_q_i(k_L,x_i,q_n):
     # see: near equation 16
     return -k_L * (x_i - q_n)
 
+
 def single_attempt(states,state,k,z,delta_t,**kw):
     """
     makes a single step/attempt at barrrier switching
@@ -273,14 +261,15 @@ def single_attempt(states,state,k,z,delta_t,**kw):
     Returns:
         next simulation state
     """
-    dV_tmp = lambda q: state.dV_n(q,z)
+    dV_tmp = state.dV_n
     q_next,swap = single_step(q_n=state.q_n,dV_dq=dV_tmp,k_i=state.k_n,
-                              delta_t=delta_t,**kw)
+                              delta_t=delta_t,z=z,**kw)
     state_n = 1-state.state if swap else state.state
     k_n,dV_n = states[state_n]
     force = k * (q_next-z)
-    return simulation_state(state=state_n,q_n=q_next,F_n=force,k_n=k_n,
-                            dV_n=dV_n,z=z,i=state.i+1,t=state.t+delta_t)
+    to_ret = simulation_state(state=state_n,q_n=q_next,F_n=force,k_n=k_n,
+                              dV_n=dV_n,z=z,i=state.i+1,t=state.t+delta_t)
+    return to_ret
 
 def _build_lambda(function,**kw):
     """
