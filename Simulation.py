@@ -30,7 +30,7 @@ class SimpleFEC(object):
     def Separation(self):
         return self.Extension
 
-class simulation_state:
+class simulation_state(object):
     # use slots to avoid ridiculous dictionary overhead.
     __slots__ = ['state','q_n', 'F_n','k_n','dV_n','z','i','t']
     def __init__(self,state,q_n,F_n,k_n,dV_n,z=None,i=0,t=0):
