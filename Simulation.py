@@ -418,6 +418,7 @@ def hummer_force_extension_curve(delta_t=1e-5,k=0.1e-3,k_L=0.29e-3,
         simulate(n_steps_equil=2000,n_steps_experiment=n_steps,**params)
     params['z_f'] = z[-1]
     full_params = dict(velocity=v,**params)
+    full_params['z_t'] = None
     return time,ext,z,force*-1,full_params, states
 
 def HummerSimpleFEC(**kwargs):
